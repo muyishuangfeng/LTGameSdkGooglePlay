@@ -1,2 +1,2 @@
-# LTGameSdkGoogle
-[![](https://jitpack.io/v/muyishuangfeng/LTGameSdkGoogle.svg)](https://jitpack.io/#muyishuangfeng/LTGameSdkGoogle)
+# LTGameSdkGooglePlay
+[![](https://jitpack.io/v/muyishuangfeng/LTGameSdkGooglePlay.svg)](https://jitpack.io/#muyishuangfeng/LTGameSdkGooglePlay)
