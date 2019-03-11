@@ -39,8 +39,8 @@ public class GooglePlayManager {
      */
     public static void initGooglePlay(Context context, String publicKey,
                                       final String LTAppID, final String LTAppKey,
-                                      final String packageId, final Map<String, Object> params,
-                                      final String gid,
+                                      final String packageId,final String gid,
+                                      final Map<String, Object> params,
                                       final OnGoogleInitListener mListener) {
         //创建谷歌帮助类
         mHelper = new IabHelper(context, publicKey);
