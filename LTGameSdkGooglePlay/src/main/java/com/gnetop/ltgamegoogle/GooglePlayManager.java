@@ -55,7 +55,7 @@ public class GooglePlayManager {
                     mListener.onGoogleInitFailed(result.getMessage());
                 } else {
                     mListener.onGoogleInitSuccess("init Success");
-                    getLTOrderID(LTAppID, LTAppKey, packageId, gid, params);
+                    getLTOrderID(LTAppID, LTAppKey, gid, packageId, params);
                 }
             }
         });
