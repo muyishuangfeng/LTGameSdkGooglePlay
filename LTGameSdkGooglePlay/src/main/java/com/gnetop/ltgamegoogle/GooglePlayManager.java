@@ -38,9 +38,6 @@ public class GooglePlayManager {
      * 初始化google
      */
     public static void initGooglePlay(Context context, String publicKey,
-                                      final String LTAppID, final String LTAppKey,
-                                      final String packageId,final String gid,
-                                      final Map<String, Object> params,
                                       final OnGoogleInitListener mListener) {
         //创建谷歌帮助类
         mHelper = new IabHelper(context, publicKey);
@@ -55,10 +52,30 @@ public class GooglePlayManager {
                     mListener.onGoogleInitFailed(result.getMessage());
                 } else {
                     mListener.onGoogleInitSuccess("init Success");
-                    getLTOrderID(LTAppID, LTAppKey, gid, packageId, params);
                 }
             }
         });
+    }
+
+    /**
+     * 开始购买
+     *
+     * @param context     上下文
+     * @param LTAppID     乐推AppID
+     * @param LTAppKey    乐推AppKey
+     * @param packageId   包名
+     * @param gid         服务器配置的商品ID
+     * @param params      自定义的信息
+     * @param requestCode 请求码
+     * @param goodsList   商品集合
+     * @param productID   商品ID
+     * @param mListener   支付结果回调
+     */
+    public static void getRecharge(final Context context, final String LTAppID, final String LTAppKey,
+                                   final String packageId, final String gid, final Map<String, Object> params,
+                                   final int requestCode, List<String> goodsList, final String productID,
+                                   final OnGooglePlayResultListener mListener) {
+        getLTOrderID(context, LTAppID, LTAppKey, packageId, gid, params, requestCode, goodsList, productID, mListener);
     }
 
     /**
@@ -70,8 +87,8 @@ public class GooglePlayManager {
      * @param productID   内购产品唯一id, 填写你自己添加的内购商品id
      * @param mListener   回调
      */
-    public static void checkUnConsume(final Context context, final int requestCode, List<String> goodsList,
-                                      final String productID, final OnGooglePlayResultListener mListener) {
+    private static void checkUnConsume(final Context context, final int requestCode, List<String> goodsList,
+                                       final String productID, final String payload, final OnGooglePlayResultListener mListener) {
         try {
             List<String> subSku = new ArrayList<>();
             mHelper.queryInventoryAsync(true, goodsList, subSku,
@@ -86,7 +103,7 @@ public class GooglePlayManager {
                                             false, "Consumption success",
                                             "Consumption failed");
                                 } else {
-                                    getProduct((Activity) context, requestCode, productID, mListener);
+                                    getProduct((Activity) context, requestCode, productID, payload, mListener);
                                 }
                             }
                         }
@@ -139,7 +156,7 @@ public class GooglePlayManager {
      * @param mListener    回调监听
      */
     private static void getProduct(final Activity context, int REQUEST_CODE,
-                                   final String SKU, final OnGooglePlayResultListener mListener) {
+                                   final String SKU, String payload, final OnGooglePlayResultListener mListener) {
         if (!TextUtils.isEmpty(payload)) {
             if (mHelper != null) {
                 try {
@@ -199,7 +216,7 @@ public class GooglePlayManager {
                 //订单信息
                 String purchaseData = data.getStringExtra("INAPP_PURCHASE_DATA");
                 String dataSignature = data.getStringExtra("INAPP_DATA_SIGNATURE");
-                if (!TextUtils.isEmpty(purchaseData)) {
+                if (!TextUtils.isEmpty(purchaseData) && !TextUtils.isEmpty(payload)) {
                     GoogleModel googleModel = new Gson().fromJson(purchaseData, GoogleModel.class);
                     Log.e(TAG, googleModel.getPurchaseToken());
                     Map<String, Object> params = new WeakHashMap<>();
@@ -221,8 +238,10 @@ public class GooglePlayManager {
      * @param gid       服务器配置商品的ID
      * @param params    集合
      */
-    private static void getLTOrderID(String LTAppID, String LTAppKey, String gid,
-                                     String packageId, Map<String, Object> params) {
+    private static void getLTOrderID(final Context context, final String LTAppID, final String LTAppKey,
+                                     final String packageId, final String gid, final Map<String, Object> params,
+                                     final int requestCode, final List<String> goodsList, final String productID,
+                                     final OnGooglePlayResultListener mListener) {
         Map<String, Object> map = new WeakHashMap<>();
         map.put("package_id", packageId);
         map.put("gid", gid);
@@ -233,6 +252,7 @@ public class GooglePlayManager {
                     public void onOrderSuccess(String result) {
                         if (!TextUtils.isEmpty(result)) {
                             payload = result;
+                            checkUnConsume(context, requestCode, goodsList, productID, result, mListener);
                         } else {
                             Log.e(TAG, "ltOrderID is null");
                         }
