@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package com.gnetop.ltgamegoogle.util;
+package com.gnetop.ltgameplay.util;
 
 /**
  * Exception thrown when something went wrong with in-app billing.

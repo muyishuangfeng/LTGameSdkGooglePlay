@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package com.gnetop.ltgamegoogle.util;
+package com.gnetop.ltgameplay.util;
 
 /**
  * Represents the result of an in-app billing operation.

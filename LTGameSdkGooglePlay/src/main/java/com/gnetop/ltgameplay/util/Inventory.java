@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package com.gnetop.ltgamegoogle.util;
+package com.gnetop.ltgameplay.util;
 
 import java.util.ArrayList;
 import java.util.HashMap;

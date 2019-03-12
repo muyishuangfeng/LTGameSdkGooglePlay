@@ -1,4 +1,4 @@
-package com.gnetop.ltgamegoogle;
+package com.gnetop.ltgameplay;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -14,14 +14,11 @@ import com.gnetop.ltgamecommon.impl.OnGooglePlayResultListener;
 import com.gnetop.ltgamecommon.impl.OnGoogleResultListener;
 import com.gnetop.ltgamecommon.login.LoginBackManager;
 import com.gnetop.ltgamecommon.model.GoogleModel;
-import com.gnetop.ltgamegoogle.util.IabHelper;
-import com.gnetop.ltgamegoogle.util.IabResult;
-import com.gnetop.ltgamegoogle.util.Inventory;
-import com.gnetop.ltgamegoogle.util.Purchase;
+import com.gnetop.ltgameplay.util.IabHelper;
+import com.gnetop.ltgameplay.util.IabResult;
+import com.gnetop.ltgameplay.util.Inventory;
+import com.gnetop.ltgameplay.util.Purchase;
 import com.google.gson.Gson;
-
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
