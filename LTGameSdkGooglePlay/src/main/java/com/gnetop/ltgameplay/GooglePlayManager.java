@@ -148,11 +148,10 @@ public class GooglePlayManager {
      * @param context      上下文
      * @param REQUEST_CODE 请求码
      * @param SKU          产品唯一id, 填写你自己添加的商品id
-     * @param payload      订单号
      * @param mListener    回调监听
      */
     public static void getProduct(final Activity context, int REQUEST_CODE,
-                                  final String SKU, String payload, final OnGooglePlayResultListener mListener) {
+                                  final String SKU,  final OnGooglePlayResultListener mListener) {
         if (!TextUtils.isEmpty(payload)) {
             if (mHelper != null) {
                 mHelper.flagEndAsync();
