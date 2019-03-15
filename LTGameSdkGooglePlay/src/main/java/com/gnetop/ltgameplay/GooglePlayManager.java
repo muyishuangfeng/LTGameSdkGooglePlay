@@ -57,35 +57,32 @@ public class GooglePlayManager {
     /**
      * 开始购买
      *
-     * @param context     上下文
-     * @param LTAppID     乐推AppID
-     * @param LTAppKey    乐推AppKey
-     * @param packageId   包名
-     * @param gid         服务器配置的商品ID
-     * @param params      自定义的信息
-     * @param requestCode 请求码
-     * @param goodsList   商品集合
-     * @param productID   商品ID
-     * @param mListener   支付结果回调
+     * @param context   上下文
+     * @param LTAppID   乐推AppID
+     * @param LTAppKey  乐推AppKey
+     * @param packageId 包名
+     * @param gid       服务器配置的商品ID
+     * @param params    自定义的信息
+     * @param goodsList 商品集合
+     * @param mListener 支付结果回调
      */
     public static void getRecharge(final Context context, final String LTAppID, final String LTAppKey,
                                    final String packageId, final String gid, final Map<String, Object> params,
-                                   final int requestCode, List<String> goodsList, final String productID,
+                                   List<String> goodsList,
                                    final OnGooglePlayResultListener mListener) {
-        getLTOrderID(context, LTAppID, LTAppKey, packageId, gid, params, requestCode, goodsList, productID, mListener);
+        getLTOrderID(context, LTAppID, LTAppKey, packageId, gid, params, goodsList, mListener);
     }
 
     /**
      * 查询是否有未消费的商品
      *
-     * @param context     上下文
-     * @param requestCode 请求码
-     * @param goodsList   商品集合
-     * @param productID   内购产品唯一id, 填写你自己添加的内购商品id
-     * @param mListener   回调
+     * @param context   上下文
+     * @param goodsList 商品集合
+     * @param productID 内购产品唯一id, 填写你自己添加的内购商品id
+     * @param mListener 回调
      */
-    private static void checkUnConsume(final Context context, final int requestCode, List<String> goodsList,
-                                       final String productID, final String payload, final OnGooglePlayResultListener mListener) {
+    private static void checkUnConsume(final Context context, List<String> goodsList,
+                                       final String productID, final OnGooglePlayResultListener mListener) {
         try {
             List<String> subSku = new ArrayList<>();
             mHelper.queryInventoryAsync(true, goodsList, subSku,
@@ -94,13 +91,14 @@ public class GooglePlayManager {
                         public void onQueryInventoryFinished(IabResult result, Inventory inv) {
                             if (result != null) {
                                 if (result.isSuccess() && inv.hasPurchase(productID)) {
-                                    //消费, 并下一步, 这里Demo里面我没做提示,将购买了,但是没消费掉的商品直接消费掉, 正常应该
+                                    //消费, 并下一步, 但是没消费掉的商品直接消费掉, 正常应该
                                     //给用户一个提示,存在未完成的支付订单,是否完成支付
                                     consumeProduct(context, inv.getPurchase(productID),
                                             false, "Consumption success",
                                             "Consumption failed");
                                 } else {
-                                    getProduct((Activity) context, requestCode, productID, payload, mListener);
+                                    mListener.onPlayError("There are unfinished orders, " +
+                                            "please repurchase");
                                 }
                             }
                         }
@@ -150,12 +148,14 @@ public class GooglePlayManager {
      * @param context      上下文
      * @param REQUEST_CODE 请求码
      * @param SKU          产品唯一id, 填写你自己添加的商品id
+     * @param payload      订单号
      * @param mListener    回调监听
      */
-    private static void getProduct(final Activity context, int REQUEST_CODE,
-                                   final String SKU, String payload, final OnGooglePlayResultListener mListener) {
+    public static void getProduct(final Activity context, int REQUEST_CODE,
+                                  final String SKU, String payload, final OnGooglePlayResultListener mListener) {
         if (!TextUtils.isEmpty(payload)) {
             if (mHelper != null) {
+                mHelper.flagEndAsync();
                 try {
                     mHelper.launchPurchaseFlow(context, SKU, REQUEST_CODE, new IabHelper.OnIabPurchaseFinishedListener() {
                         @Override
@@ -192,6 +192,7 @@ public class GooglePlayManager {
          */
         if (mHelper != null) {
             try {
+                mHelper.flagEndAsync();
                 mHelper.dispose();
             } catch (IabHelper.IabAsyncInProgressException e) {
                 e.printStackTrace();
@@ -237,7 +238,7 @@ public class GooglePlayManager {
      */
     private static void getLTOrderID(final Context context, final String LTAppID, final String LTAppKey,
                                      final String packageId, final String gid, final Map<String, Object> params,
-                                     final int requestCode, final List<String> goodsList, final String productID,
+                                     final List<String> goodsList,
                                      final OnGooglePlayResultListener mListener) {
         Map<String, Object> map = new WeakHashMap<>();
         map.put("package_id", packageId);
@@ -249,7 +250,7 @@ public class GooglePlayManager {
                     public void onOrderSuccess(String result) {
                         if (!TextUtils.isEmpty(result)) {
                             payload = result;
-                            checkUnConsume(context, requestCode, goodsList, productID, result, mListener);
+                            checkUnConsume(context, goodsList, result, mListener);
                         } else {
                             Log.e(TAG, "ltOrderID is null");
                         }
