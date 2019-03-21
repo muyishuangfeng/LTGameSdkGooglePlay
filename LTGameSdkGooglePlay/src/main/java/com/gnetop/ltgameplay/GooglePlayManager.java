@@ -342,10 +342,12 @@ public class GooglePlayManager {
                     public void onPlaySuccess(String result) {
                         mListener.onResultSuccess(result);
                         //购买成功，调用消耗
-                        try {
-                            mHelper.consumeAsync(mPurchase,mConsumeFinishedListener);
-                        } catch (IabHelper.IabAsyncInProgressException e) {
-                            e.printStackTrace();
+                        if (mPurchase!=null){
+                            try {
+                                mHelper.consumeAsync(mPurchase,mConsumeFinishedListener);
+                            } catch (IabHelper.IabAsyncInProgressException e) {
+                                e.printStackTrace();
+                            }
                         }
                     }
 
