@@ -22,6 +22,7 @@ import com.gnetop.ltgameplay.util.Purchase;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
+import java.util.IllegalFormatCodePointException;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -108,38 +109,29 @@ public class GooglePlayManager {
     private void checkUnConsume(final Context context, List<String> goodsList,
                                 final String productID, final OnGooglePlayResultListener mListener) {
         try {
-            List<String> subSku = new ArrayList<>();
-            mHelper.queryInventoryAsync(true, goodsList, subSku,
+            mHelper.queryInventoryAsync(true, goodsList, goodsList,
                     new IabHelper.QueryInventoryFinishedListener() {
                         @Override
                         public void onQueryInventoryFinished(IabResult result, Inventory inv) {
                             if (mHelper == null) return;
-                            if (result.isFailure()) {
-                                mListener.onPlayError(result.getMessage());
-                                return;
-                            }
-                            List<Purchase> list = inv.getAllPurchases();
-                            for (int i = 0; i < list.size(); i++) {
-                                Purchase purchase = list.get(i);
-                                if (purchase != null) {
-                                    try {
-                                        mHelper.consumeAsync(purchase, mConsumeFinishedListener);
-                                    } catch (IabHelper.IabAsyncInProgressException e) {
-                                        e.printStackTrace();
-                                    }
+//                            if (result.isFailure()) {
+//                                mListener.onPlayError(result.getMessage());
+//                                isGetGold = true;
+//                                return;
+//                            }
+                            if (result != null) {
+                                if (result.isSuccess() && inv.hasPurchase(productID)) {
+                                    //消费, 并下一步, 将购买了,但是没消费掉的商品直接消费掉, 正常应该
+                                    //给用户一个提示,存在未完成的支付订单,是否完成支付
+                                    consumeProduct(context, inv.getPurchase(productID),
+                                            false, "Consumption success",
+                                            "Consumption failed");
+                                } else {
+                                    mListener.onPlayError("Please Try Again");
+                                    isGetGold = true;
                                 }
                             }
-//                            if (result.isSuccess() && inv.hasPurchase(productID)) {
-//                                //消费, 并下一步, 但是没消费掉的商品直接消费掉, 正常应该
-//                                //给用户一个提示,存在未完成的支付订单,是否完成支付
-//                                consumeProduct(context, inv.getPurchase(productID),
-//                                        false, "Consumption success",
-//                                        "Consumption failed");
-//                            }
-//                                else {
-//                                    mListener.onPlayError("Please Try Again");
-//                                    isGetGold = true;
-//                                }
+
                         }
 
                     });
@@ -148,37 +140,37 @@ public class GooglePlayManager {
         }
     }
 
-//    /**
-//     * 消费掉商品
-//     *
-//     * @param purchase
-//     * @param needNext
-//     * @param tipmsg1
-//     * @param tipmsg2
-//     */
-//    private void consumeProduct(final Context context, Purchase purchase, final boolean needNext,
-//                                final String tipmsg1, final String tipmsg2) {
-//        try {
-//            mHelper.consumeAsync(purchase, new IabHelper.OnConsumeFinishedListener() {
-//                @Override
-//                public void onConsumeFinished(Purchase purchase, IabResult result) {
-//                    if (mHelper == null) {
-//                        return;
-//                    }
-//                    if (result.isSuccess()) {
-//                        if (!needNext) {
-//                            //处理中断的情况, 仅仅只是消费掉上一次未正常完成的商品
-//                            Toast.makeText(context, tipmsg1, Toast.LENGTH_SHORT).show();
-//                        }
-//                    } else {
-//                        Toast.makeText(context, tipmsg2, Toast.LENGTH_SHORT).show();
-//                    }
-//                }
-//            });
-//        } catch (IabHelper.IabAsyncInProgressException e) {
-//            e.printStackTrace();
-//        }
-//    }
+    /**
+     * 消费掉商品
+     *
+     * @param purchase
+     * @param needNext
+     * @param tipmsg1
+     * @param tipmsg2
+     */
+    private void consumeProduct(final Context context, Purchase purchase, final boolean needNext,
+                                final String tipmsg1, final String tipmsg2) {
+        try {
+            mHelper.consumeAsync(purchase, new IabHelper.OnConsumeFinishedListener() {
+                @Override
+                public void onConsumeFinished(Purchase purchase, IabResult result) {
+                    if (mHelper == null) {
+                        return;
+                    }
+                    if (result.isSuccess()) {
+                        if (!needNext) {
+                            //处理中断的情况, 仅仅只是消费掉上一次未正常完成的商品
+                            Toast.makeText(context, tipmsg1, Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        Toast.makeText(context, tipmsg2, Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        } catch (IabHelper.IabAsyncInProgressException e) {
+            e.printStackTrace();
+        }
+    }
 
     // 商品消耗完成的监听
     IabHelper.OnConsumeFinishedListener mConsumeFinishedListener = new IabHelper.OnConsumeFinishedListener() {
@@ -192,6 +184,7 @@ public class GooglePlayManager {
             Log.d(TAG, "End consumption flow.");
         }
     };
+
     /**
      * 产品获取
      *
@@ -205,6 +198,7 @@ public class GooglePlayManager {
                             final String SKU, String payload, final OnGooglePlayResultListener mListener) {
         if (!TextUtils.isEmpty(payload)) {
             if (mHelper != null) {
+                mHelper.flagEndAsync();
                 try {
                     mHelper.launchPurchaseFlow(context, SKU, REQUEST_CODE, new IabHelper.OnIabPurchaseFinishedListener() {
                         @Override
@@ -342,12 +336,9 @@ public class GooglePlayManager {
                     public void onPlaySuccess(String result) {
                         mListener.onResultSuccess(result);
                         //购买成功，调用消耗
-                        if (mPurchase!=null){
-                            try {
-                                mHelper.consumeAsync(mPurchase,mConsumeFinishedListener);
-                            } catch (IabHelper.IabAsyncInProgressException e) {
-                                e.printStackTrace();
-                            }
+                        if (mPurchase != null) {
+                            consumeProduct(context, mPurchase, false, "Payment success",
+                                    "Payment Failed");
                         }
                     }
 
