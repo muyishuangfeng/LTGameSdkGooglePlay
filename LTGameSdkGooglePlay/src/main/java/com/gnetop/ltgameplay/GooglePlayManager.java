@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
@@ -21,8 +20,6 @@ import com.gnetop.ltgameplay.util.Inventory;
 import com.gnetop.ltgameplay.util.Purchase;
 import com.google.gson.Gson;
 
-import java.util.ArrayList;
-import java.util.IllegalFormatCodePointException;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -32,9 +29,9 @@ public class GooglePlayManager {
     @SuppressLint("StaticFieldLeak")
     private static IabHelper mHelper;
     private static String payload;
-    private boolean isGetGold = false;
     private static GooglePlayManager sInstance;
     private Purchase mPurchase;
+
 
     private GooglePlayManager() {
     }
@@ -73,10 +70,35 @@ public class GooglePlayManager {
                     mListener.onGoogleInitFailed(result.getMessage());
                 } else {
                     mListener.onGoogleInitSuccess("init Success");
+                    try {
+                        mHelper.queryInventoryAsync(new IabHelper.QueryInventoryFinishedListener() {
+                            @Override
+                            public void onQueryInventoryFinished(IabResult result, Inventory inventory) {
+                                if (mHelper == null) return;
+                                if (result.isFailure()) {
+                                    return;
+                                }
+                                List<Purchase> list = inventory.getAllPurchases();
+                                for (int i = 0; i < list.size(); i++) {
+                                    Purchase purchase = list.get(i);
+                                    if (purchase != null) {
+                                        try {
+                                            mHelper.consumeAsync(purchase, mConsumeFinishedListener);
+                                        } catch (IabHelper.IabAsyncInProgressException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    } catch (IabHelper.IabAsyncInProgressException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         });
     }
+
 
     /**
      * 开始购买
@@ -106,7 +128,7 @@ public class GooglePlayManager {
      * @param productID 内购产品唯一id, 填写你自己添加的内购商品id
      * @param mListener 回调
      */
-    private void checkUnConsume(final Context context, List<String> goodsList,
+    private void checkUnConsume(final Context context, List<String> goodsList, final int REQUEST_CODE,
                                 final String productID, final OnGooglePlayResultListener mListener) {
         try {
             mHelper.queryInventoryAsync(true, goodsList, goodsList,
@@ -127,8 +149,8 @@ public class GooglePlayManager {
                                             false, "Consumption success",
                                             "Consumption failed");
                                 } else {
-                                    mListener.onPlayError("Please Try Again");
-                                    isGetGold = true;
+                                    getProduct((Activity) context, REQUEST_CODE,
+                                            payload, productID, mListener);
                                 }
                             }
 
@@ -173,15 +195,15 @@ public class GooglePlayManager {
     }
 
     // 商品消耗完成的监听
-    IabHelper.OnConsumeFinishedListener mConsumeFinishedListener = new IabHelper.OnConsumeFinishedListener() {
+    private IabHelper.OnConsumeFinishedListener mConsumeFinishedListener = new IabHelper.OnConsumeFinishedListener() {
         public void onConsumeFinished(Purchase purchase, IabResult result) {
             if (mHelper == null) return;
             if (result.isSuccess()) {
-                Log.d(TAG, "Consumption successful. Provisioning.");
+                Log.e(TAG, "Consumption successful. Provisioning.");
             } else {
-                Log.d(TAG, "Error while consuming. Provisioning.");
+                Log.e(TAG, "Error while consuming. Provisioning.");
             }
-            Log.d(TAG, "End consumption flow.");
+            Log.e(TAG, "End consumption flow.");
         }
     };
 
@@ -198,7 +220,6 @@ public class GooglePlayManager {
                             final String SKU, String payload, final OnGooglePlayResultListener mListener) {
         if (!TextUtils.isEmpty(payload)) {
             if (mHelper != null) {
-                mHelper.flagEndAsync();
                 try {
                     mHelper.launchPurchaseFlow(context, SKU, REQUEST_CODE, new IabHelper.OnIabPurchaseFinishedListener() {
                         @Override
@@ -206,13 +227,17 @@ public class GooglePlayManager {
                             if (result.isFailure()) {
                                 Toast.makeText(context, "Purchase Failed", Toast.LENGTH_SHORT).show();
                                 mListener.onPlayError(result.getMessage());
+                                try {
+                                    if (purchase != null)
+                                        mHelper.consumeAsync(purchase, mConsumeFinishedListener);
+                                } catch (IabHelper.IabAsyncInProgressException e) {
+                                    e.printStackTrace();
+                                }
                             } else if (result.isSuccess()) {
                                 mListener.onPlaySuccess("Purchase successful");
                                 if (purchase.getSku().equals(SKU)) {
                                     mPurchase = purchase;
-                                    isGetGold = false;
                                 }
-                                isGetGold = false;
                             }
                         }
                     }, payload);
@@ -234,12 +259,7 @@ public class GooglePlayManager {
          * 释放掉资源
          */
         if (mHelper != null) {
-            try {
-                mHelper.dispose();
-                isGetGold = false;
-            } catch (IabHelper.IabAsyncInProgressException e) {
-                e.printStackTrace();
-            }
+            mHelper.disposeWhenFinished();
         }
         mHelper = null;
     }
@@ -294,11 +314,7 @@ public class GooglePlayManager {
                     public void onOrderSuccess(String result) {
                         if (!TextUtils.isEmpty(result)) {
                             payload = result;
-                            if (!isGetGold) {
-                                checkUnConsume(context, goodsList, result, mListener);
-                            } else {
-                                getProduct((Activity) context, REQUEST_CODE, productID, payload, mListener);
-                            }
+                            checkUnConsume(context, goodsList, REQUEST_CODE, productID, mListener);
                         } else {
                             Log.e(TAG, "ltOrderID is null");
                         }
