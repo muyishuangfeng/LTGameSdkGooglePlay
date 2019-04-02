@@ -20,158 +20,79 @@ import com.gnetop.ltgameplay.util.Inventory;
 import com.gnetop.ltgameplay.util.Purchase;
 import com.google.gson.Gson;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
 public class GooglePlayManager {
+
     private static final String TAG = GooglePlayManager.class.getSimpleName();
+    private volatile static GooglePlayManager sInstance;
     @SuppressLint("StaticFieldLeak")
     private static IabHelper mHelper;
+    private static boolean mSetupDone = false;
+    private static String mPublicKey;
     private static String payload;
-    private static GooglePlayManager sInstance;
-    private Purchase mPurchase;
 
-
-    private GooglePlayManager() {
-    }
 
     /**
-     * 单例
+     * 初始化
      *
-     * @return
+     * @param context   上下文
+     * @param publicKey 公钥
+     * @param productID 商品ID
+     * @param goodsList 商品集合
+     * @param mListener 接口
      */
-    public static synchronized GooglePlayManager getInstance() {
-        if (sInstance == null) {
-            synchronized (GooglePlayManager.class) {
-                if (sInstance == null) {
-                    sInstance = new GooglePlayManager();
-                }
-            }
-        }
-        return sInstance;
-    }
-
-    /**
-     * 初始化google
-     */
-    public void initGooglePlay(Context context, String publicKey,
-                               final OnGoogleInitListener mListener) {
+    public static void init(final Context context, String publicKey, final String productID,
+                            final List<String> goodsList, final OnGoogleInitListener mListener) {
+        mPublicKey = publicKey;
         //创建谷歌帮助类
         mHelper = new IabHelper(context, publicKey);
         mHelper.enableDebugLogging(true);
-        /**
-         * 初始化和连接谷歌服务
-         */
         mHelper.startSetup(new IabHelper.OnIabSetupFinishedListener() {
             @Override
             public void onIabSetupFinished(IabResult result) {
                 if (!result.isSuccess()) {
                     mListener.onGoogleInitFailed(result.getMessage());
+                    mSetupDone = false;
                 } else {
+                    mSetupDone = true;
                     mListener.onGoogleInitSuccess("init Success");
+                    //getLTOrderID(LTAppID, LTAppKey,gid, packageId, params);
                     try {
-                        mHelper.queryInventoryAsync(new IabHelper.QueryInventoryFinishedListener() {
-                            @Override
-                            public void onQueryInventoryFinished(IabResult result, Inventory inventory) {
-                                if (mHelper == null) return;
-                                if (result.isFailure()) {
-                                    return;
-                                }
-                                List<Purchase> list = inventory.getAllPurchases();
-                                for (int i = 0; i < list.size(); i++) {
-                                    Purchase purchase = list.get(i);
-                                    if (purchase != null) {
-                                        try {
-                                            mHelper.consumeAsync(purchase, mConsumeFinishedListener);
-                                        } catch (IabHelper.IabAsyncInProgressException e) {
-                                            e.printStackTrace();
+                        mHelper.queryInventoryAsync(true, goodsList, goodsList,
+                                new IabHelper.QueryInventoryFinishedListener() {
+                                    @Override
+                                    public void onQueryInventoryFinished(IabResult result, Inventory inv) {
+                                        if (result != null) {
+                                            if (result.isSuccess() && inv.hasPurchase(productID)) {
+                                                //消费, 并下一步, 这里Demo里面我没做提示,将购买了,但是没消费掉的商品直接消费掉, 正常应该
+                                                //给用户一个提示,存在未完成的支付订单,是否完成支付
+                                                consumeProduct(context, inv.getPurchase(productID),
+                                                        false, "Consumption success",
+                                                        "Consumption failed");
+                                            }
                                         }
                                     }
-                                }
-                            }
-                        });
+
+                                });
                     } catch (IabHelper.IabAsyncInProgressException e) {
                         e.printStackTrace();
                     }
                 }
             }
         });
-    }
 
 
-    /**
-     * 开始购买
-     *
-     * @param context   上下文
-     * @param LTAppID   乐推AppID
-     * @param LTAppKey  乐推AppKey
-     * @param packageId 包名
-     * @param gid       服务器配置的商品ID
-     * @param params    自定义的信息
-     * @param goodsList 商品集合
-     * @param mListener 支付结果回调
-     */
-    public void getRecharge(final Context context, final String LTAppID, final String LTAppKey,
-                            final String packageId, final String gid, final Map<String, Object> params,
-                            List<String> goodsList, final String productID, final int REQUEST_CODE,
-                            final OnGooglePlayResultListener mListener) {
-        getLTOrderID(context, LTAppID, LTAppKey, packageId, gid, params, goodsList,
-                productID, REQUEST_CODE, mListener);
-    }
-
-    /**
-     * 查询是否有未消费的商品
-     *
-     * @param context   上下文
-     * @param goodsList 商品集合
-     * @param productID 内购产品唯一id, 填写你自己添加的内购商品id
-     * @param mListener 回调
-     */
-    private void checkUnConsume(final Context context, List<String> goodsList, final int REQUEST_CODE,
-                                final String productID, final OnGooglePlayResultListener mListener) {
-        try {
-            mHelper.queryInventoryAsync(true, goodsList, goodsList,
-                    new IabHelper.QueryInventoryFinishedListener() {
-                        @Override
-                        public void onQueryInventoryFinished(IabResult result, Inventory inv) {
-                            if (mHelper == null) return;
-//                            if (result.isFailure()) {
-//                                mListener.onPlayError(result.getMessage());
-//                                isGetGold = true;
-//                                return;
-//                            }
-                            if (result != null) {
-                                if (result.isSuccess() && inv.hasPurchase(productID)) {
-                                    //消费, 并下一步, 将购买了,但是没消费掉的商品直接消费掉, 正常应该
-                                    //给用户一个提示,存在未完成的支付订单,是否完成支付
-                                    consumeProduct(context, inv.getPurchase(productID),
-                                            false, "Consumption success",
-                                            "Consumption failed");
-                                } else {
-                                    getProduct((Activity) context, REQUEST_CODE,
-                                            payload, productID, mListener);
-                                }
-                            }
-
-                        }
-
-                    });
-        } catch (IabHelper.IabAsyncInProgressException e) {
-            e.printStackTrace();
-        }
     }
 
     /**
      * 消费掉商品
-     *
-     * @param purchase
-     * @param needNext
-     * @param tipmsg1
-     * @param tipmsg2
      */
-    private void consumeProduct(final Context context, Purchase purchase, final boolean needNext,
-                                final String tipmsg1, final String tipmsg2) {
+    private static void consumeProduct(final Context context, Purchase purchase, final boolean needNext,
+                                       final String tipmsg1, final String tipmsg2) {
         try {
             mHelper.consumeAsync(purchase, new IabHelper.OnConsumeFinishedListener() {
                 @Override
@@ -194,102 +115,71 @@ public class GooglePlayManager {
         }
     }
 
-    // 商品消耗完成的监听
-    private IabHelper.OnConsumeFinishedListener mConsumeFinishedListener = new IabHelper.OnConsumeFinishedListener() {
-        public void onConsumeFinished(Purchase purchase, IabResult result) {
-            if (mHelper == null) return;
-            if (result.isSuccess()) {
-                Log.e(TAG, "Consumption successful. Provisioning.");
-            } else {
-                Log.e(TAG, "Error while consuming. Provisioning.");
-            }
-            Log.e(TAG, "End consumption flow.");
-        }
-    };
-
     /**
-     * 产品获取
+     * 购买
      *
-     * @param context      上下文
-     * @param REQUEST_CODE 请求码
-     * @param SKU          产品唯一id, 填写你自己添加的商品id
-     * @param payload      订单号
-     * @param mListener    回调监听
+     * @param context     上下文
+     * @param LTAppID     乐推AppID
+     * @param LTAppKey    乐推AppKey
+     * @param gid         订单ID
+     * @param packageId   包名
+     * @param params      自定义参数
+     * @param requestCode 请求码
+     * @param goodsList   商品集合
+     * @param productID   商品ID
+     * @param mListener   接口
      */
-    private void getProduct(final Activity context, int REQUEST_CODE,
-                            final String SKU, String payload, final OnGooglePlayResultListener mListener) {
-        if (!TextUtils.isEmpty(payload)) {
-            if (mHelper != null) {
-                try {
-                    mHelper.launchPurchaseFlow(context, SKU, REQUEST_CODE, new IabHelper.OnIabPurchaseFinishedListener() {
-                        @Override
-                        public void onIabPurchaseFinished(IabResult result, final Purchase purchase) {
-                            if (result.isFailure()) {
-                                Toast.makeText(context, "Purchase Failed", Toast.LENGTH_SHORT).show();
-                                mListener.onPlayError(result.getMessage());
-                                try {
-                                    if (purchase != null)
-                                        mHelper.consumeAsync(purchase, mConsumeFinishedListener);
-                                } catch (IabHelper.IabAsyncInProgressException e) {
-                                    e.printStackTrace();
-                                }
-                            } else if (result.isSuccess()) {
-                                mListener.onPlaySuccess("Purchase successful");
-                                if (purchase.getSku().equals(SKU)) {
-                                    mPurchase = purchase;
+    public static void recharge(final Context context, String LTAppID, String LTAppKey, String gid,
+                                String packageId, Map<String, Object> params, final int requestCode,
+                                List<String> goodsList, final String productID,
+                                final OnGooglePlayResultListener mListener) {
+        if (mSetupDone) {
+            getLTOrderID(LTAppID, LTAppKey, gid, packageId, params);
+            try {
+                if (mHelper == null) return;
+                List<String> subSku = new ArrayList<>();
+                mHelper.queryInventoryAsync(true, goodsList, subSku,
+                        new IabHelper.QueryInventoryFinishedListener() {
+                            @Override
+                            public void onQueryInventoryFinished(IabResult result, Inventory inv) {
+                                if (result != null) {
+                                    if (result.isSuccess() && inv.hasPurchase(productID)) {
+                                        //消费, 并下一步, 这里Demo里面我没做提示,将购买了,但是没消费掉的商品直接消费掉, 正常应该
+                                        //给用户一个提示,存在未完成的支付订单,是否完成支付
+                                        consumeProduct(context, inv.getPurchase(productID),
+                                                false, "Consumption success",
+                                                "Consumption failed");
+                                    } else {
+                                        getProduct((Activity) context, requestCode, productID, mListener);
+                                    }
                                 }
                             }
-                        }
-                    }, payload);
-                } catch (IabHelper.IabAsyncInProgressException e) {
-                    e.printStackTrace();
-                }
+
+                        });
+            } catch (IabHelper.IabAsyncInProgressException e) {
+                e.printStackTrace();
             }
         } else {
-            mListener.onPlayError("Order creation failed");
-            Toast.makeText(context, "Order creation failed", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /**
-     * 释放资源
-     */
-    public void release() {
-        /*
-         * 释放掉资源
-         */
-        if (mHelper != null) {
-            mHelper.disposeWhenFinished();
-        }
-        mHelper = null;
-    }
-
-
-    public void onActivityResult(Context context, int requestCode, int resultCode, Intent data, int selfRequestCode,
-                                 final String LTAppID, final String LTAppKey, OnGoogleResultListener
-                                         mListener) {
-        /*
-         * 将回调交给帮助类来处理, 否则会出现支付正在进行的错误
-         */
-        if (mHelper != null) {
-            mHelper.handleActivityResult(requestCode, resultCode, data);
-            if (requestCode == selfRequestCode) {
-                int responseCode = data.getIntExtra("RESPONSE_CODE", 0);
-                //订单信息
-                String purchaseData = data.getStringExtra("INAPP_PURCHASE_DATA");
-                String dataSignature = data.getStringExtra("INAPP_DATA_SIGNATURE");
-                if (!TextUtils.isEmpty(purchaseData) && !TextUtils.isEmpty(payload)) {
-                    GoogleModel googleModel = new Gson().fromJson(purchaseData, GoogleModel.class);
-                    Log.e(TAG, googleModel.getPurchaseToken());
-                    Map<String, Object> params = new WeakHashMap<>();
-                    params.put("purchase_token", googleModel.getPurchaseToken());
-                    params.put("lt_order_id", payload);
-                    uploadToServer(context, LTAppID, LTAppKey, params, mListener);
-                }
+            if (TextUtils.isEmpty(mPublicKey)) {
+                //创建谷歌帮助类
+                mHelper = new IabHelper(context, mPublicKey);
+                mHelper.enableDebugLogging(true);
+                mHelper.startSetup(new IabHelper.OnIabSetupFinishedListener() {
+                    @Override
+                    public void onIabSetupFinished(IabResult result) {
+                        if (result.isFailure()) {
+                            mSetupDone = false;
+                        }
+                        if (result.isSuccess()) {
+                            mSetupDone = true;
+                        }
+                    }
+                });
             }
-        }
 
+        }
     }
+
 
     /**
      * 获取乐推订单ID
@@ -297,13 +187,10 @@ public class GooglePlayManager {
      * @param LTAppID   appID
      * @param LTAppKey  appKey
      * @param packageId 应用包名
-     * @param gid       服务器配置商品的ID
      * @param params    集合
      */
-    private void getLTOrderID(final Context context, final String LTAppID, final String LTAppKey,
-                              final String packageId, final String gid, final Map<String, Object> params,
-                              final List<String> goodsList, final String productID, final int REQUEST_CODE,
-                              final OnGooglePlayResultListener mListener) {
+    private static void getLTOrderID(String LTAppID, String LTAppKey, String gid,
+                                     String packageId, Map<String, Object> params) {
         Map<String, Object> map = new WeakHashMap<>();
         map.put("package_id", packageId);
         map.put("gid", gid);
@@ -314,7 +201,6 @@ public class GooglePlayManager {
                     public void onOrderSuccess(String result) {
                         if (!TextUtils.isEmpty(result)) {
                             payload = result;
-                            checkUnConsume(context, goodsList, REQUEST_CODE, productID, mListener);
                         } else {
                             Log.e(TAG, "ltOrderID is null");
                         }
@@ -332,29 +218,118 @@ public class GooglePlayManager {
                 });
     }
 
+
     /**
-     * 上传到服务器
+     * 产品获取
      *
-     * @param LTAppID   乐推订单
-     * @param LTAppKey  乐推APPkey
-     * @param params
-     * @param mListener 结果
+     * @param context      上下文
+     * @param REQUEST_CODE 请求码
+     * @param SKU          产品唯一id, 填写你自己添加的商品id
+     * @param mListener    回调监听
      */
-    private void uploadToServer(final Context context,
-                                final String LTAppID,
-                                final String LTAppKey,
-                                Map<String, Object> params,
-                                final OnGoogleResultListener mListener) {
+    private static void getProduct(final Activity context, int REQUEST_CODE,
+                                   final String SKU, final OnGooglePlayResultListener mListener) {
+        if (!TextUtils.isEmpty(payload)) {
+            try {
+                mHelper.launchPurchaseFlow(context, SKU, REQUEST_CODE, new IabHelper.OnIabPurchaseFinishedListener() {
+                    @Override
+                    public void onIabPurchaseFinished(IabResult result, Purchase purchase) {
+                        if (result.isFailure()) {
+                            Toast.makeText(context, "Purchase Failed", Toast.LENGTH_SHORT).show();
+                            mListener.onPlayError(result.getMessage());
+                            return;
+                        }
+                        mListener.onPlaySuccess("Purchase successful");
+                        if (purchase.getSku().equals(SKU)) {
+                            //购买成功，调用消耗
+                            consumeProduct(context, purchase, false, "Payment success",
+                                    "Payment Failed");
+                        }
+                    }
+                }, payload);
+            } catch (IabHelper.IabAsyncInProgressException e) {
+                e.printStackTrace();
+            }
+        } else {
+            mListener.onPlayError("Order creation failed");
+            Toast.makeText(context, "Order creation failed", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * 回调
+     *
+     * @param context         上下文
+     * @param requestCode     请求码
+     * @param resultCode      结果码
+     * @param data            数据
+     * @param selfRequestCode 自定义请求码
+     * @param LTAppID         乐推AppID
+     * @param LTAppKey        乐推AppKey
+     * @param goodsList       商品集合
+     * @param productID       商品ID
+     * @param mListener       请求结果接口
+     */
+    public static void onActivityResult(Context context, int requestCode, int resultCode, Intent data, int selfRequestCode,
+                                        final String LTAppID, final String LTAppKey, final List<String> goodsList,
+                                        final String productID, OnGoogleResultListener mListener) {
+        //将回调交给帮助类来处理, 否则会出现支付正在进行的错误
+        if (mHelper == null) return;
+        mHelper.handleActivityResult(requestCode, resultCode, data);
+        if (requestCode == selfRequestCode) {
+            int responseCode = data.getIntExtra("RESPONSE_CODE", 0);
+            //订单信息
+            String purchaseData = data.getStringExtra("INAPP_PURCHASE_DATA");
+            String dataSignature = data.getStringExtra("INAPP_DATA_SIGNATURE");
+            if (!TextUtils.isEmpty(purchaseData)) {
+                GoogleModel googleModel = new Gson().fromJson(purchaseData, GoogleModel.class);
+                Log.e(TAG, googleModel.getPurchaseToken());
+                Map<String, Object> params = new WeakHashMap<>();
+                params.put("purchase_token", googleModel.getPurchaseToken());
+                params.put("lt_order_id", payload);
+                uploadToServer(context, LTAppID, LTAppKey, params, goodsList, productID, mListener);
+            }
+        }
+
+    }
+
+    /**
+     * 上传到服务器验证
+     */
+    private static void uploadToServer(final Context context,
+                                       final String LTAppID,
+                                       final String LTAppKey,
+                                       Map<String, Object> params,
+                                       final List<String> goodsList,
+                                       final String productID,
+                                       final OnGoogleResultListener mListener) {
         LoginBackManager.googlePlay(
                 LTAppID, LTAppKey, params
                 , new OnGooglePlayResultListener() {
                     @Override
                     public void onPlaySuccess(String result) {
                         mListener.onResultSuccess(result);
-                        //购买成功，调用消耗
-                        if (mPurchase != null) {
-                            consumeProduct(context, mPurchase, false, "Payment success",
-                                    "Payment Failed");
+                        if (mSetupDone) {
+                            try {
+                                mHelper.queryInventoryAsync(true, goodsList, goodsList,
+                                        new IabHelper.QueryInventoryFinishedListener() {
+                                            @Override
+                                            public void onQueryInventoryFinished(IabResult result, Inventory inv) {
+                                                if (result != null) {
+                                                    if (result.isSuccess() && inv.hasPurchase(productID)) {
+                                                        //消费, 并下一步, 这里Demo里面我没做提示,将购买了,但是没消费掉的商品直接消费掉, 正常应该
+                                                        //给用户一个提示,存在未完成的支付订单,是否完成支付
+                                                        consumeProduct(context, inv.getPurchase(productID),
+                                                                false, "Consumption success",
+                                                                "Consumption failed");
+                                                    }
+                                                }
+                                            }
+
+                                        });
+                            } catch (IabHelper.IabAsyncInProgressException e) {
+                                e.printStackTrace();
+                            }
                         }
                     }
 
@@ -375,5 +350,14 @@ public class GooglePlayManager {
                 });
     }
 
-}
+    /**
+     * 释放资源
+     */
+    public static void release() {
+        if (mHelper != null) {
+            mHelper.disposeWhenFinished();
+        }
+        mHelper = null;
+    }
 
+}
