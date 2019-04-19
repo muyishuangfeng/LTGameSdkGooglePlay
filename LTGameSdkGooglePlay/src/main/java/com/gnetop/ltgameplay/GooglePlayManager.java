@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.provider.SyncStateContract;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
@@ -134,7 +135,7 @@ public class GooglePlayManager {
                                 List<String> goodsList, final String productID,
                                 final OnGooglePlayResultListener mListener) {
         if (mSetupDone) {
-            getLTOrderID(LTAppID, LTAppKey, gid, packageId, params);
+            getLTOrderID(context,LTAppID, LTAppKey, gid, packageId, params);
             try {
                 if (mHelper == null) return;
                 List<String> subSku = new ArrayList<>();
@@ -189,13 +190,13 @@ public class GooglePlayManager {
      * @param packageId 应用包名
      * @param params    集合
      */
-    private static void getLTOrderID(String LTAppID, String LTAppKey, String gid,
+    private static void getLTOrderID(Context context,String LTAppID, String LTAppKey, String gid,
                                      String packageId, Map<String, Object> params) {
         Map<String, Object> map = new WeakHashMap<>();
         map.put("package_id", packageId);
         map.put("gid", gid);
         map.put("custom", params);
-        LoginBackManager.createOrder(LTAppID,
+        LoginBackManager.createOrder(context,LTAppID,
                 LTAppKey, map, new OnCreateOrderListener() {
                     @Override
                     public void onOrderSuccess(String result) {
