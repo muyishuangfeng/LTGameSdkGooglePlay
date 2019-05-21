@@ -1,12 +1,10 @@
 package com.gnetop.ltgameplay;
-
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.text.TextUtils;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.gnetop.ltgamecommon.impl.OnCreateOrderListener;
 import com.gnetop.ltgamecommon.impl.OnGoogleInitListener;
@@ -106,7 +104,7 @@ public class GooglePlayManager {
                             //Toast.makeText(context, tipmsg1, Toast.LENGTH_SHORT).show();
                         }
                     } else {
-                       // Toast.makeText(context, tipmsg2, Toast.LENGTH_SHORT).show();
+                        // Toast.makeText(context, tipmsg2, Toast.LENGTH_SHORT).show();
                     }
                 }
             });
@@ -357,5 +355,6 @@ public class GooglePlayManager {
         }
         mHelper = null;
     }
+
 
 }
