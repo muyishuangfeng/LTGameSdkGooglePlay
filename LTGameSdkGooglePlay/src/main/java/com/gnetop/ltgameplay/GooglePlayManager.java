@@ -268,7 +268,7 @@ public class GooglePlayManager {
      */
     public static void onActivityResult(Context context, int requestCode, int resultCode, Intent data, int selfRequestCode,
                                         final String LTAppID, final String LTAppKey, final List<String> goodsList,
-                                        final String productID,int testID, OnGoogleResultListener mListener) {
+                                        final String productID, OnGoogleResultListener mListener) {
         //将回调交给帮助类来处理, 否则会出现支付正在进行的错误
         if (mHelper == null) return;
         mHelper.handleActivityResult(requestCode, resultCode, data);
@@ -283,7 +283,6 @@ public class GooglePlayManager {
                 Map<String, Object> params = new WeakHashMap<>();
                 params.put("purchase_token", googleModel.getPurchaseToken());
                 params.put("lt_order_id", payload);
-                params.put("pay_test", testID);
                 uploadToServer(context, LTAppID, LTAppKey, params, goodsList, productID, mListener);
             }
         }
