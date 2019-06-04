@@ -130,9 +130,10 @@ public class GooglePlayManager {
     public static void recharge(final Context context, String LTAppID, String LTAppKey, String gid,
                                 String packageId, Map<String, Object> params, final int requestCode,
                                 List<String> goodsList, final String productID,
-                                final OnGooglePlayResultListener mListener) {
+                                final OnGooglePlayResultListener mListener,
+                                final OnCreateOrderListener mCreateListener) {
         if (mSetupDone) {
-            getLTOrderID(context,LTAppID, LTAppKey, gid, packageId, params);
+            getLTOrderID(context,LTAppID, LTAppKey, gid, packageId, params,mCreateListener);
             try {
                 if (mHelper == null) return;
                 List<String> subSku = new ArrayList<>();
@@ -187,8 +188,9 @@ public class GooglePlayManager {
      * @param packageId 应用包名
      * @param params    集合
      */
-    private static void getLTOrderID(Context context,String LTAppID, String LTAppKey, String gid,
-                                     String packageId, Map<String, Object> params) {
+    private static void getLTOrderID(Context context, String LTAppID, String LTAppKey, String gid,
+                                     String packageId, Map<String, Object> params,
+                                     final OnCreateOrderListener mListener) {
         Map<String, Object> map = new WeakHashMap<>();
         map.put("package_id", packageId);
         map.put("gid", gid);
@@ -207,11 +209,13 @@ public class GooglePlayManager {
                     @Override
                     public void onOrderFailed(Throwable ex) {
                         Log.e(TAG, ex.getMessage());
+                        mListener.onOrderFailed(ex);
                     }
 
                     @Override
                     public void onOrderError(String error) {
                         Log.e(TAG, error);
+                        mListener.onOrderError(error);
                     }
                 });
     }
